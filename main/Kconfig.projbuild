@@ -1,0 +1,249 @@
+menu "ADC FFT Stream"
+
+choice FFT_BUILD_MODE
+    prompt "Build mode"
+    default FFT_BUILD_TRANSPORT
+    help
+        Select the build mode for FFT output.
+        TRANSPORT: Raw complex FFT bins for host-side IFFT reconstruction.
+        DISPLAY: Magnitude output (optionally with windowing/filtering) for visualization.
+
+config FFT_BUILD_TRANSPORT
+    bool "Transport (raw complex bins)"
+    help
+        Transmit unmodified complex FFT bins. The host can reconstruct time-domain via IFFT.
+        Windowing, Top-K, cutoff Hz, and IIR filtering are forbidden in this mode.
+
+config FFT_BUILD_DISPLAY
+    bool "Display (magnitude output)"
+    help
+        Transmit magnitude (linear or dB) for visualization. Allows windowing and filtering.
+
+endchoice
+
+config ADC_FS
+    int "ADC sample rate (samples/s)"
+    default 44100
+    help
+        Target sampling rate for adc_continuous. 44,000 sps targets a ~22 kHz Nyquist limit.
+
+config ADC_FFT_SIZE
+    int "FFT size"
+    default 2048
+    range 512 4096
+    help
+        FFT length (power of two). 2048 gives ~21.5 Hz bins at 44 KS/s. 4096 halves bin width at higher CPU cost.
+
+# FFT processing options
+menu "FFT options"
+
+config ADC_ENABLE_WINDOW
+    bool "Apply Hann window before FFT"
+    default n
+    depends on FFT_BUILD_DISPLAY
+    help
+        Enable windowing on each frame to reduce spectral leakage.
+        Only available in DISPLAY mode (forbidden in TRANSPORT mode).
+
+choice ADC_WINDOW_TYPE
+    prompt "Window function"
+    default ADC_WINDOW_HANN
+    depends on ADC_ENABLE_WINDOW
+    help
+        Select the window function applied before FFT.
+
+config ADC_WINDOW_NONE
+    bool "Rectangular (none)"
+
+config ADC_WINDOW_HANN
+    bool "Hann"
+
+config ADC_WINDOW_BLACKMAN
+    bool "Blackman"
+
+config ADC_WINDOW_BLACKMAN_HARRIS
+    bool "Blackman-Harris"
+
+config ADC_WINDOW_BLACKMAN_NUTTALL
+    bool "Blackman-Nuttall"
+
+config ADC_WINDOW_NUTTALL
+    bool "Nuttall"
+
+config ADC_WINDOW_FLAT_TOP
+    bool "Flat-Top"
+
+endchoice
+
+choice ADC_MAG_OUTPUT
+    prompt "FFT magnitude output"
+    default ADC_MAG_OUTPUT_LOG
+    help
+        Select how FFT magnitude values are reported over the CDC frames.
+
+config ADC_MAG_OUTPUT_LINEAR
+    bool "Linear magnitude"
+
+config ADC_MAG_OUTPUT_LOG
+    bool "Logarithmic (dB)"
+
+endchoice
+
+config OUTPUT_TOPK_ENABLE
+    bool "Enable Top-K bin selection"
+    default n
+    depends on FFT_BUILD_DISPLAY
+    help
+        When enabled, only the K strongest bins are kept (others zeroed).
+        When disabled, the full spectrum is sent.
+        Only available in DISPLAY mode (forbidden in TRANSPORT mode).
+
+config OUTPUT_TOPK_K
+    int "Top-K bins"
+    default 16
+    range 1 2048
+    depends on OUTPUT_TOPK_ENABLE
+    help
+        Number of bins to keep after Top-K selection. Clamped to available bins.
+
+config OUTPUT_CUTOFF_HZ
+    int "Output cutoff frequency (Hz, 0=disabled)"
+    default 0
+    range 0 200000
+    depends on FFT_BUILD_DISPLAY
+    help
+        If non-zero, bins above this frequency are zeroed before Top-K selection.
+        Only available in DISPLAY mode (forbidden in TRANSPORT mode).
+
+endmenu
+
+config ADC_CH0
+    int "ADC1 channel for input 0"
+    default 0
+    help
+        ADC1 channel index (GPIO1 is ADC1_CH0 on ESP32-S3).
+
+config ADC_CH1
+    int "ADC1 channel for input 1"
+    default 1
+    help
+        ADC1 channel index (GPIO2 is ADC1_CH1 on ESP32-S3).
+
+choice ADC_ATTEN
+    prompt "ADC attenuation"
+    default ADC_ATTEN_DB_11
+    help
+        Select attenuation for both channels.
+
+config ADC_ATTEN_DB_0
+    bool "0 dB"
+
+config ADC_ATTEN_DB_2_5
+    bool "2.5 dB"
+
+config ADC_ATTEN_DB_6
+    bool "6 dB"
+
+config ADC_ATTEN_DB_11
+    bool "11 dB"
+
+endchoice
+
+menu "ADC IIR Filter"
+
+    config ADC_IIR_FILTER_ENABLE
+        bool "Enable ADC IIR Filter"
+        default n
+        depends on FFT_BUILD_DISPLAY
+        help
+            Enable the hardware IIR filter on the continuous ADC stream.
+            Only available in DISPLAY mode (forbidden in TRANSPORT mode).
+
+    choice ADC_IIR_FILTER_COEFF
+        prompt "Filter Coefficient"
+        depends on ADC_IIR_FILTER_ENABLE
+        default ADC_IIR_FILTER_COEFF_2
+        help
+            The filter coefficient determines the cutoff frequency.
+            y[n] = (x[n] + (c-1)*y[n-1])/c
+
+    config ADC_IIR_FILTER_COEFF_2
+        bool "2"
+    
+    config ADC_IIR_FILTER_COEFF_4
+        bool "4"
+        
+    config ADC_IIR_FILTER_COEFF_8
+        bool "8"
+        
+    config ADC_IIR_FILTER_COEFF_16
+        bool "16"
+
+    config ADC_IIR_FILTER_COEFF_64
+        bool "64"
+
+    endchoice
+
+endmenu
+
+
+menu "Status LED (NeoPixel)"
+
+config STATUS_NEOPIXEL_ENABLE
+    bool "Enable NeoPixel status LED"
+    default y
+    help
+        Enable a single NeoPixel (WS2812) for status feedback.
+
+config STATUS_NEOPIXEL_GPIO
+    int "NeoPixel GPIO"
+    default 48
+    range 0 48
+    depends on STATUS_NEOPIXEL_ENABLE
+    help
+        GPIO used by the onboard NeoPixel data line. Many ESP32-S3 boards use GPIO48.
+
+config STATUS_NEOPIXEL_BRIGHTNESS
+    int "NeoPixel brightness (1-255)"
+    default 32
+    range 1 255
+    depends on STATUS_NEOPIXEL_ENABLE
+    help
+        Brightness scaling factor (1=dim, 255=max).
+
+endmenu
+
+menu "Wave Generator Configuration"
+
+    config ENABLE_I2S_WAVE_GEN
+        bool "Enable I2S Wave Generator"
+        default n
+        help
+            Enable the I2S-based wave generator for testing audio output.
+            Uses GPIO 16 (BCK), 17 (WS), 18 (DO).
+
+    config ENABLE_SDM_WAVE_GEN
+        bool "Enable 1-bit SDM Wave Generator"
+        default n
+        help
+            Enable Sigma-Delta Modulator based waveform generation.
+            Uses a single GPIO and a hardware timer to output a
+            PDM sine wave (requires RC filter).
+
+    config SDM_GPIO
+        int "SDM GPIO"
+        default 38
+        depends on ENABLE_SDM_WAVE_GEN
+        help
+            GPIO pin for the SDM output.
+
+    config SDM_FREQ_HZ
+        int "SDM Tone Frequency (Hz)"
+        default 333
+        depends on ENABLE_SDM_WAVE_GEN
+        help
+            Frequency of the generated sine wave.
+
+endmenu
+
+endmenu
