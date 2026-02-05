@@ -93,7 +93,7 @@ def main() -> int:
     parser.add_argument("--reconnect-delay", type=float, default=0.5, help="Seconds between reconnect attempts")
     parser.add_argument("--no-plot-freq", action="store_true", help="Disable Frequency Domain plot within plotting mode")
     parser.add_argument("--no-plot-time", action="store_true", help="Disable Time Domain plot within plotting mode")
-    parser.add_argument("-w", "--window", choices=['0', '1', '2', '3'], default='3', help="Windowing: 0=None, 1=Hann, 2=Hamming, 3=Blackman")
+    parser.add_argument("-w", "--window", choices=['0', '1', '2', '3'], default='0', help="Windowing: 0=None, 1=Hann, 2=Hamming, 3=Blackman")
     parser.add_argument("--inspect-frames", action="store_true", help="Print frame metadata and payload sample for debugging")
     args = parser.parse_args()
 
@@ -224,6 +224,7 @@ def main() -> int:
         if args.plot:
             import matplotlib.pyplot as plt
             import matplotlib.animation as animation
+            import matplotlib.ticker as ticker
             import numpy as np
         
             def get_window(name: str, N: int):
@@ -255,6 +256,7 @@ def main() -> int:
                 ax_time.set_ylabel("Amplitude")
                 ax_time.legend(loc="upper right")
                 ax_time.grid(True)
+                ax_time.format_coord = lambda x, y: f"Time: {x:.6f} s, Amp: {y:.4f}"
 
             if not args.no_plot_freq:
                 fig_freq = plt.figure("Frequency Domain", figsize=(10, 5))
@@ -266,7 +268,13 @@ def main() -> int:
                 ax_freq.set_xlabel("Frequency (Hz)")
                 ax_freq.set_ylabel("Magnitude (dB)")
                 ax_freq.legend(loc="upper right")
-                ax_freq.grid(True)
+                
+                # More frequent frequency scale steps
+                ax_freq.xaxis.set_major_locator(ticker.MaxNLocator(nbins=20))
+                ax_freq.xaxis.set_minor_locator(ticker.AutoMinorLocator(5))
+                ax_freq.grid(True, which='major', alpha=0.8)
+                ax_freq.grid(True, which='minor', alpha=0.4, linestyle='--')
+                ax_freq.format_coord = lambda x, y: f"Freq: {x:.2f} Hz, Mag: {y:.2f} dB"
             
             if not figs:
                 print("Warning: Plotting enabled but both Time and Freq plots disabled.")

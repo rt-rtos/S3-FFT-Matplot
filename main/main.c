@@ -367,6 +367,10 @@ static void adc_fft_task(void *arg) {
   }
 #endif
 
+  /* Per-channel sampling rate: adc_continuous divides sample_freq_hz by the
+   * pattern length. With two channels, each gets half the configured rate. */
+  const uint32_t per_channel_sps = sample_rate / CHANNELS;
+
   adc_digi_pattern_config_t pattern[CHANNELS] = {0};
   pattern[0].atten = atten;
   pattern[0].channel = CONFIG_ADC_CH0;
@@ -411,9 +415,9 @@ static void adc_fft_task(void *arg) {
   ESP_ERROR_CHECK(adc_continuous_start(adc_handle));
 
   ESP_LOGI(TAG,
-           "Sampling ADC1 CH%d (GPIO%d) and CH%d (GPIO%d) at %u sps, FFT %d",
+           "Sampling ADC1 CH%d (GPIO%d) and CH%d (GPIO%d) at %u sps/ch, FFT %d",
            CONFIG_ADC_CH0, CONFIG_ADC_CH0 + 1, CONFIG_ADC_CH1,
-           CONFIG_ADC_CH1 + 1, (unsigned)sample_rate, FFT_SIZE);
+           CONFIG_ADC_CH1 + 1, (unsigned)per_channel_sps, FFT_SIZE);
 
   const size_t read_len = FFT_SIZE * CHANNELS * sizeof(adc_digi_output_data_t);
   uint8_t *raw = heap_caps_aligned_alloc(16, read_len,
@@ -434,6 +438,8 @@ static void adc_fft_task(void *arg) {
 #endif
     int count0 = 0;
     int count1 = 0;
+    double sum0 = 0;
+    double sum1 = 0;
     while (count0 < FFT_SIZE || count1 < FFT_SIZE) {
       uint32_t out_len = 0;
       esp_err_t ret = adc_continuous_read(adc_handle, raw, read_len, &out_len,
@@ -449,15 +455,27 @@ static void adc_fft_task(void *arg) {
       for (uint32_t i = 0; i + sizeof(adc_digi_output_data_t) <= out_len;
            i += sizeof(adc_digi_output_data_t)) {
         adc_digi_output_data_t *p = (adc_digi_output_data_t *)&raw[i];
-        if (p->type2.unit != ADC_UNIT_1) { continue; }
+        if (p->type2.unit != ADC_UNIT_1) {
+          continue;
+        }
         if (p->type2.channel == CONFIG_ADC_CH0 && count0 < FFT_SIZE) {
-          ch0[count0++] = sample_to_centered(p->type2.data, calibrated,
-                                             midpoint_mv);
+          float val = sample_to_centered(p->type2.data, calibrated, midpoint_mv);
+          ch0[count0++] = val;
+          sum0 += val;
         } else if (p->type2.channel == CONFIG_ADC_CH1 && count1 < FFT_SIZE) {
-          ch1[count1++] = sample_to_centered(p->type2.data, calibrated,
-                                             midpoint_mv);
+          float val = sample_to_centered(p->type2.data, calibrated, midpoint_mv);
+          ch1[count1++] = val;
+          sum1 += val;
         }
       }
+    }
+
+    /* Dynamic DC bias removal: subtract current block mean */
+    float mean0 = (float)(sum0 / FFT_SIZE);
+    float mean1 = (float)(sum1 / FFT_SIZE);
+    for (int i = 0; i < FFT_SIZE; i++) {
+      ch0[i] -= mean0;
+      ch1[i] -= mean1;
     }
 
 #if CONFIG_ADC_ENABLE_WINDOW
@@ -467,17 +485,17 @@ static void adc_fft_task(void *arg) {
     perform_fft(ch0);
     perform_fft(ch1);
 
-    apply_complex_cutoff(ch0, ADC_SPS);
-    apply_complex_cutoff(ch1, ADC_SPS);
+    apply_complex_cutoff(ch0, per_channel_sps);
+    apply_complex_cutoff(ch1, per_channel_sps);
 
     uint64_t now_ms = esp_timer_get_time() / 1000ULL;
 
-    build_frame(&frame, ch0, "ch0", now_ms, ADC_SPS, g_seq++);
+    build_frame(&frame, ch0, "ch0", now_ms, per_channel_sps, g_seq++);
     if (xQueueSend(g_frameq, &frame, portMAX_DELAY) != pdTRUE) {
       ESP_LOGW(TAG, "Frame queue send failed (ch0)");
     }
 
-    build_frame(&frame, ch1, "ch1", now_ms, ADC_SPS, g_seq++);
+    build_frame(&frame, ch1, "ch1", now_ms, per_channel_sps, g_seq++);
     if (xQueueSend(g_frameq, &frame, portMAX_DELAY) != pdTRUE) {
       ESP_LOGW(TAG, "Frame queue send failed (ch1)");
     }

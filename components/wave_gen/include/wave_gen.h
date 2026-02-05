@@ -70,6 +70,20 @@ void wave_gen_set_type(wave_type_t type);
  */
 void wave_gen_set_volume(float volume);
 
+/**
+ * @brief Start the SDM sine generator (uses CONFIG_SDM_* settings)
+ *
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t wave_gen_sdm_start(void);
+
+/**
+ * @brief Stop the SDM sine generator
+ *
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t wave_gen_sdm_stop(void);
+
 #ifdef __cplusplus
 }
 #endif
