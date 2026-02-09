@@ -73,7 +73,6 @@ typedef struct __attribute__((packed)) {
 #define FRAME_PAYLOAD_SIZE (sizeof(frame_payload_t)) // Real data
 #define FRAME_TOTAL_SIZE                                                       \
   (FRAME_HEADER_SIZE + FRAME_PAYLOAD_SIZE + 4u) // +4 for CRC32
-
 _Static_assert(FRAME_PAYLOAD_SIZE <= UINT16_MAX,
                "payload length must fit in uint16");
 _Static_assert((FRAME_PAYLOAD_SIZE % 4u) == 0u,
@@ -328,7 +327,7 @@ static void status_led_set(uint8_t r, uint8_t g, uint8_t b) {
   ESP_ERROR_CHECK(led_strip_refresh(g_led_strip));
   if (g_led_lock) {
     xSemaphoreGive(g_led_lock);
-  }
+  } 
 }
 #endif
 
@@ -694,6 +693,7 @@ void app_main(void) {
   xTaskCreatePinnedToCore(
                           adc_fft_task,
                           "adc_fft",
+
                           ADC_TASK_STACK_SIZE,
                           NULL,
                           6,
@@ -702,3 +702,5 @@ void app_main(void) {
 
   // Tasks run indefinitely; app_main can return.
 }
+
+
