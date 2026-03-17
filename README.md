@@ -18,6 +18,19 @@ The main goals were:
 - test the limits and practical viability of the ESP32-S3 as a DSP platform
 - use platform-specific optimizations where they actually improve the pipeline
 
+## Video of a Sweep and both Plotting Domains active
+
+
+
+
+
+https://github.com/user-attachments/assets/b648e1cd-7d1b-4a7f-8c6a-fcc077de2a4f
+
+
+
+
+--- 
+
 ## System Overview
 
 The current repo is configured as a transport build. That means the firmware sends raw complex FFT bins to the host, and the host can reconstruct or visualize the signal as needed.
@@ -32,6 +45,10 @@ flowchart LR
   F --> G[tools/serial_binary.py]
   G --> H[plots, CSV, debug output]
 ```
+
+
+
+
 
 In practice the data path is:
 
