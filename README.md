@@ -82,8 +82,7 @@ git clone <repo-url>
 cd newproject
 # Init IDF project/workspace
 idf.py menuconfig 
-# Change PSRAM and Flash size if they differ
-# from my ESP32-S3 N16R8 defaults
+# Change PSRAM and Flash size if they differ from my N16R8 defaults
 idf.py build
 idf.py flash
 idf.py monitor
