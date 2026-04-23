@@ -78,8 +78,9 @@ In practice the data path is:
 From a fresh clone:
 
 ```bash
-git clone <repo-url>
-cd newproject
+git clone https://github.com/rt-rtos/S3-FFT-Matplot.git
+cd S3-FFT-Matplot
+
 # Init IDF project/workspace
 idf.py menuconfig 
 # Change PSRAM and Flash size if they differ from my N16R8 defaults
@@ -115,7 +116,6 @@ The checked-in `menuconfig` configuration is tuned for the current transport dem
 
 ---
 > The **Kconfig** Transport and Display mode hooks are deprecated.
-
 > The functionality for on device Windowing, Top-K bins, IIR filtering remains and could be re-enabled with some work.
 
 
